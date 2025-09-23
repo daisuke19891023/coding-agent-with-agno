@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
-from clean_interfaces.agents import create_coding_agent, create_repository_qa_agent
+from clean_interfaces.agents import (
+    create_coding_agent,
+    create_repository_qa_agent,
+    create_serena_coder_agent,
+)
 from clean_interfaces.prompts import load_prompt
 from clean_interfaces.utils.settings import get_agent_settings, get_mcp_settings
 
@@ -70,7 +74,7 @@ def run_coding_agent(prompt: str) -> str:
 def run_repository_qa_agent(
     prompt: str,
     *,
-    project_path: "Path | None" = None,
+    project_path: Path | None = None,
 ) -> str:
     """Execute the repository QA agent and return its response text."""
     settings = get_agent_settings()
@@ -82,6 +86,36 @@ def run_repository_qa_agent(
     agent = cast(
         "SupportsAgentRun",
         create_repository_qa_agent(
+            settings=settings,
+            mcp_settings=mcp_settings,
+            instructions=instructions,
+            project_path=project_path,
+        ),
+    )
+
+    try:
+        result = agent.run(prompt)
+    except Exception as exc:  # pragma: no cover - agno handles specifics internally
+        raise AgentExecutionError(str(exc)) from exc
+
+    return _coerce_response_to_string(result)
+
+
+def run_serena_coder_agent(
+    prompt: str,
+    *,
+    project_path: Path | None = None,
+) -> str:
+    """Execute the Serena-backed coding agent and return its response text."""
+    settings = get_agent_settings()
+    if not settings.openai_api_key:
+        raise AgentConfigurationError
+
+    instructions = load_prompt("serena_coder_agent")
+    mcp_settings = get_mcp_settings()
+    agent = cast(
+        "SupportsAgentRun",
+        create_serena_coder_agent(
             settings=settings,
             mcp_settings=mcp_settings,
             instructions=instructions,

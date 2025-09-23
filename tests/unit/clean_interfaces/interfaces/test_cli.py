@@ -131,3 +131,43 @@ class TestCLIInterface:
             )
             mock_console.print.assert_any_call("QA response")
             mock_console.file.flush.assert_called_once()
+
+    def test_cli_serena_agent_requires_api_key(self) -> None:
+        """The serena-agent command should exit when the API key is missing."""
+        cli = CLIInterface()
+
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch(
+                "clean_interfaces.interfaces.cli.run_serena_coder_agent",
+            ) as mock_run,
+        ):
+            mock_run.side_effect = AgentConfigurationError("missing key")
+
+            with pytest.raises(typer.Exit):
+                cli.serena_agent("hello")
+
+            mock_console.print.assert_called_once()
+
+    def test_cli_serena_agent_generates_response(self, tmp_path: Path) -> None:
+        """The serena-agent command should print the coding agent response."""
+        cli = CLIInterface()
+
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch(
+                "clean_interfaces.interfaces.cli.run_serena_coder_agent",
+            ) as mock_run,
+        ):
+            mock_run.return_value = "Serena response"
+
+            mock_console.file = MagicMock()
+
+            cli.serena_agent("Implement feature", project_path=tmp_path)
+
+            mock_run.assert_called_once_with(
+                "Implement feature",
+                project_path=tmp_path,
+            )
+            mock_console.print.assert_any_call("Serena response")
+            mock_console.file.flush.assert_called_once()
