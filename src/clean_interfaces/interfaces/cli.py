@@ -1,16 +1,18 @@
 """CLI interface implementation using Typer."""
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
 
-from clean_interfaces.models.io import WelcomeMessage
 from clean_interfaces.core import (
     AgentConfigurationError,
     AgentExecutionError,
     run_coding_agent,
+    run_repository_qa_agent,
 )
+from clean_interfaces.models.io import WelcomeMessage
 
 from .base import BaseInterface
 
@@ -47,6 +49,7 @@ class CLIInterface(BaseInterface):
         # Set the default command to welcome
         self.app.command(name="welcome")(self.welcome)
         self.app.command(name="agent")(self.agent)
+        self.app.command(name="repo-agent")(self.repo_agent)
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -82,6 +85,48 @@ class CLIInterface(BaseInterface):
 
         try:
             response_text = run_coding_agent(prompt)
+        except AgentConfigurationError as exc:
+            console.print(
+                "[red]OpenAI API key not configured. "
+                "Set the OPENAI_API_KEY environment variable.[/red]",
+            )
+            self.logger.error("Agent configuration error", error=str(exc))
+            raise typer.Exit(1) from exc
+        except AgentExecutionError as exc:  # pragma: no cover - agno handles specifics
+            self.logger.error("Agent execution failed", error=str(exc))
+            console.print(f"[red]Failed to generate response: {exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        console.print(response_text)
+        console.file.flush()
+
+    def repo_agent(
+        self,
+        prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt to send to the repository QA agent."),
+        ],
+        project_path: Annotated[
+            Path | None,
+            typer.Option(
+                "--path",
+                "-p",
+                exists=True,
+                file_okay=False,
+                dir_okay=True,
+                help="Optional project directory to explore during QA.",
+            ),
+        ] = None,
+    ) -> None:
+        """Generate a response using the repository QA agent."""
+        self.logger.info(
+            "Running repository QA agent",
+            prompt=prompt,
+            project_path=str(project_path) if project_path else None,
+        )
+
+        try:
+            response_text = run_repository_qa_agent(prompt, project_path=project_path)
         except AgentConfigurationError as exc:
             console.print(
                 "[red]OpenAI API key not configured. "

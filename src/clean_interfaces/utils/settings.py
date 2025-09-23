@@ -181,6 +181,48 @@ class AgentSettings(BaseSettings):
     )
 
 
+class MCPSettings(BaseSettings):
+    """Configuration for MCP integrations used by agents."""
+
+    instance: ClassVar[Any] = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        env_prefix="MCP_",
+    )
+
+    lsp_walker_provider: Literal["serena"] = Field(
+        default="serena",
+        description="Identifier for the LSP walker provider to use.",
+    )
+    lsp_walker_command: str = Field(
+        default=(
+            "uvx --from git+https://github.com/oraios/serena serena start-mcp-server"
+        ),
+        description="Command used to launch the default LSP walker MCP server.",
+    )
+    lsp_walker_context: str | None = Field(
+        default="ide-assistant",
+        description="Optional context passed to the MCP server.",
+    )
+    lsp_walker_transport: Literal["stdio", "sse", "streamable-http"] = Field(
+        default="stdio",
+        description="Transport protocol used to connect to the MCP server.",
+    )
+    lsp_walker_timeout_seconds: int = Field(
+        default=60,
+        description="Read timeout applied when communicating with the MCP server.",
+        ge=1,
+    )
+    lsp_walker_url: str | None = Field(
+        default=None,
+        description="Optional URL for transports that require explicit endpoints.",
+    )
+
+
 def get_settings() -> LoggingSettings:
     """Get the global settings instance.
 
@@ -231,3 +273,15 @@ def get_agent_settings() -> AgentSettings:
 def reset_agent_settings() -> None:
     """Reset the global agent settings instance."""
     AgentSettings.instance = None
+
+
+def get_mcp_settings() -> MCPSettings:
+    """Get the global MCP settings instance."""
+    if MCPSettings.instance is None:
+        MCPSettings.instance = MCPSettings()
+    return MCPSettings.instance
+
+
+def reset_mcp_settings() -> None:
+    """Reset the global MCP settings instance."""
+    MCPSettings.instance = None

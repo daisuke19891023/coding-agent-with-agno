@@ -1,13 +1,14 @@
 """Tests for CLI interface implementation."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
+from clean_interfaces.core import AgentConfigurationError
 from clean_interfaces.interfaces.base import BaseInterface
 from clean_interfaces.interfaces.cli import CLIInterface
-from clean_interfaces.core import AgentConfigurationError
 
 
 class TestCLIInterface:
@@ -60,9 +61,12 @@ class TestCLIInterface:
         """The agent command should exit when the API key is missing."""
         cli = CLIInterface()
 
-        with patch("clean_interfaces.interfaces.cli.console") as mock_console, patch(
-            "clean_interfaces.interfaces.cli.run_coding_agent",
-        ) as mock_run:
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch(
+                "clean_interfaces.interfaces.cli.run_coding_agent",
+            ) as mock_run,
+        ):
             mock_run.side_effect = AgentConfigurationError("missing key")
 
             with pytest.raises(typer.Exit):
@@ -86,4 +90,44 @@ class TestCLIInterface:
 
             mock_run.assert_called_once_with("Write code")
             mock_console.print.assert_any_call("Agent response")
+            mock_console.file.flush.assert_called_once()
+
+    def test_cli_repo_agent_requires_api_key(self) -> None:
+        """The repo-agent command should exit when the API key is missing."""
+        cli = CLIInterface()
+
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch(
+                "clean_interfaces.interfaces.cli.run_repository_qa_agent",
+            ) as mock_run,
+        ):
+            mock_run.side_effect = AgentConfigurationError("missing key")
+
+            with pytest.raises(typer.Exit):
+                cli.repo_agent("hello")
+
+            mock_console.print.assert_called_once()
+
+    def test_cli_repo_agent_generates_response(self, tmp_path: Path) -> None:
+        """The repo-agent command should call the QA agent and print the response."""
+        cli = CLIInterface()
+
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch(
+                "clean_interfaces.interfaces.cli.run_repository_qa_agent",
+            ) as mock_run,
+        ):
+            mock_run.return_value = "QA response"
+
+            mock_console.file = MagicMock()
+
+            cli.repo_agent("Where is the config?", project_path=tmp_path)
+
+            mock_run.assert_called_once_with(
+                "Where is the config?",
+                project_path=tmp_path,
+            )
+            mock_console.print.assert_any_call("QA response")
             mock_console.file.flush.assert_called_once()
