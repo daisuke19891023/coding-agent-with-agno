@@ -8,6 +8,7 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 
 from clean_interfaces.mcp import create_lsp_walker
+from clean_interfaces.llm import create_model
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +24,10 @@ def create_repository_qa_agent(
     project_path: Path | None = None,
 ) -> Agent:
     """Create an agent configured for repository exploration."""
-    model = OpenAIChat(id=settings.openai_model, api_key=settings.openai_api_key)
+    if getattr(settings, "provider", "openai") == "openai":
+        model = OpenAIChat(id=settings.openai_model, api_key=settings.openai_api_key)
+    else:
+        model = create_model(settings)
 
     walker = create_lsp_walker(mcp_settings, project_path=project_path)
     toolkit = walker.create_toolkit()
