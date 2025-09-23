@@ -34,7 +34,12 @@ class SupportsStringContent(Protocol):
 class SupportsAgentRun(Protocol):
     """Protocol capturing the subset of the agno Agent interface we rely on."""
 
-    def run(self, input: str, *, stream: bool | None = None) -> SupportsStringContent | str:
+    def run(
+        self,
+        prompt: str,
+        *,
+        stream: bool | None = None,
+    ) -> SupportsStringContent | str:
         """Execute the agent and return its response."""
         ...
 
@@ -46,7 +51,10 @@ def run_coding_agent(prompt: str) -> str:
         raise AgentConfigurationError
 
     instructions = load_prompt("coding_agent")
-    agent = cast(SupportsAgentRun, create_coding_agent(settings=settings, instructions=instructions))
+    agent = cast(
+        "SupportsAgentRun",
+        create_coding_agent(settings=settings, instructions=instructions),
+    )
 
     try:
         result = agent.run(prompt, stream=False)
@@ -58,7 +66,6 @@ def run_coding_agent(prompt: str) -> str:
 
 def _coerce_response_to_string(result: SupportsStringContent | str | object) -> str:
     """Convert a variety of agno run outputs into plain text."""
-
     if isinstance(result, str):
         return result
 
