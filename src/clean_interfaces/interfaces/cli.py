@@ -1,9 +1,16 @@
 """CLI interface implementation using Typer."""
 
+from typing import Annotated
+
 import typer
 from rich.console import Console
 
 from clean_interfaces.models.io import WelcomeMessage
+from clean_interfaces.core import (
+    AgentConfigurationError,
+    AgentExecutionError,
+    run_coding_agent,
+)
 
 from .base import BaseInterface
 
@@ -39,6 +46,7 @@ class CLIInterface(BaseInterface):
         """Set up CLI commands."""
         # Set the default command to welcome
         self.app.command(name="welcome")(self.welcome)
+        self.app.command(name="agent")(self.agent)
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -57,6 +65,36 @@ class CLIInterface(BaseInterface):
         console.print(msg.message)
         console.print(msg.hint)
         # Force flush to ensure output is visible
+        console.file.flush()
+
+    def agent(
+        self,
+        prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt to send to the coding agent."),
+        ],
+    ) -> None:
+        """Generate a response using an agno-powered coding agent."""
+        self.logger.info(
+            "Running agno agent",
+            prompt=prompt,
+        )
+
+        try:
+            response_text = run_coding_agent(prompt)
+        except AgentConfigurationError as exc:
+            console.print(
+                "[red]OpenAI API key not configured. "
+                "Set the OPENAI_API_KEY environment variable.[/red]",
+            )
+            self.logger.error("Agent configuration error", error=str(exc))
+            raise typer.Exit(1) from exc
+        except AgentExecutionError as exc:  # pragma: no cover - agno handles specifics
+            self.logger.error("Agent execution failed", error=str(exc))
+            console.print(f"[red]Failed to generate response: {exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        console.print(response_text)
         console.file.flush()
 
     def run(self) -> None:

@@ -153,6 +153,34 @@ class InterfaceSettings(BaseSettings):
         return InterfaceType(self.interface_type)
 
 
+class AgentSettings(BaseSettings):
+    """Configuration settings for agent integrations."""
+
+    instance: ClassVar[Any] = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        env_prefix="AGNO_",
+    )
+
+    openai_api_key: str | None = Field(
+        default=None,
+        validation_alias="OPENAI_API_KEY",
+        description="OpenAI API key used by agno agents.",
+    )
+    openai_model: str = Field(
+        default="gpt-4o-mini",
+        description="Default OpenAI model identifier for agno agents.",
+    )
+    agent_name: str = Field(
+        default="Clean Interfaces Agent",
+        description="Display name assigned to agno agents.",
+    )
+
+
 def get_settings() -> LoggingSettings:
     """Get the global settings instance.
 
@@ -191,3 +219,15 @@ def reset_interface_settings() -> None:
     This is mainly useful for testing.
     """
     InterfaceSettings.instance = None
+
+
+def get_agent_settings() -> AgentSettings:
+    """Get the global agent settings instance."""
+    if AgentSettings.instance is None:
+        AgentSettings.instance = AgentSettings()
+    return AgentSettings.instance
+
+
+def reset_agent_settings() -> None:
+    """Reset the global agent settings instance."""
+    AgentSettings.instance = None
