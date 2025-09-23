@@ -10,6 +10,7 @@ from clean_interfaces.core import (
     AgentConfigurationError,
     AgentExecutionError,
     run_coding_agent,
+    run_linter_workflow,
     run_repository_qa_agent,
     run_serena_coder_agent,
     run_tdd_workflow,
@@ -55,6 +56,7 @@ class CLIInterface(BaseInterface):
         self.app.command(name="repo-agent")(self.repo_agent)
         self.app.command(name="serena-agent")(self.serena_agent)
         self.app.command(name="tdd")(self.tdd)
+        self.app.command(name="lint")(self.lint)
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -258,6 +260,88 @@ class CLIInterface(BaseInterface):
         except TestCommandExecutionError as exc:
             self.logger.error("Test command execution failed", error=str(exc))
             console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        step_results = list(workflow_run.step_results or [])
+        for step in step_results:
+            step_name = getattr(step, "step_name", None) or "Workflow step"
+            console.rule(step_name)
+            content = getattr(step, "content", None)
+            if isinstance(content, str):
+                console.print(content)
+            elif content is not None:
+                console.print(str(content))
+
+        final_content = workflow_run.content
+        if isinstance(final_content, str):
+            last_content = (
+                getattr(step_results[-1], "content", None) if step_results else None
+            )
+            if not step_results or final_content != last_content:
+                console.rule("Workflow summary")
+                console.print(final_content)
+        elif final_content is not None and not step_results:
+            console.rule("Workflow summary")
+            console.print(str(final_content))
+
+        console.file.flush()
+
+    def lint(
+        self,
+        linter_command: Annotated[
+            str,
+            typer.Argument(help="Linter command or alias to execute (e.g. 'ruff')."),
+        ],
+        targets: Annotated[
+            list[str],
+            typer.Argument(help="Files or directories to lint."),
+        ],
+        project_path: Annotated[
+            Path | None,
+            typer.Option(
+                "--path",
+                "-p",
+                exists=True,
+                file_okay=False,
+                dir_okay=True,
+                help="Optional project directory for running the linter.",
+            ),
+        ] = None,
+        fix_instructions: Annotated[
+            str | None,
+            typer.Option(
+                "--fix-instructions",
+                help=(
+                    "Optional additional instructions for the agent when proposing fixes."
+                ),
+            ),
+        ] = None,
+    ) -> None:
+        """Run the linter workflow and display results."""
+        self.logger.info(
+            "Running linter workflow",
+            linter_command=linter_command,
+            targets=targets,
+            project_path=str(project_path) if project_path else None,
+        )
+
+        try:
+            workflow_run = run_linter_workflow(
+                linter_command=linter_command,
+                targets=targets,
+                project_path=project_path,
+                fix_instructions=fix_instructions,
+            )
+        except AgentConfigurationError as exc:
+            console.print(
+                "[red]OpenAI API key not configured. "
+                "Set the OPENAI_API_KEY environment variable.[/red]",
+            )
+            self.logger.error("Agent configuration error", error=str(exc))
+            raise typer.Exit(1) from exc
+        except AgentExecutionError as exc:
+            self.logger.error("Agent execution failed", error=str(exc))
+            console.print(f"[red]Failed to run linter workflow: {exc}[/red]")
             raise typer.Exit(1) from exc
 
         step_results = list(workflow_run.step_results or [])

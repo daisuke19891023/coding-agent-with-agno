@@ -11,7 +11,8 @@ from clean_interfaces.agents import (
 )
 from clean_interfaces.prompts import load_prompt
 from clean_interfaces.utils.settings import get_agent_settings, get_mcp_settings
-from clean_interfaces.workflow import create_tdd_workflow
+from clean_interfaces.workflow import create_linter_workflow, create_tdd_workflow
+from clean_interfaces.workflow.linter import LinterWorkflowConfig
 from clean_interfaces.workflow.tdd import TDDWorkflowConfig
 
 if TYPE_CHECKING:
@@ -162,6 +163,41 @@ def run_tdd_workflow(
         ),
         test_writer_runner=run_coding_agent,
         implementation_runner=run_coding_agent,
+    )
+
+    return workflow.run()
+
+
+def run_linter_workflow(
+    *,
+    linter_command: str,
+    targets: list[str],
+    project_path: "Path | None" = None,
+    fix_instructions: str | None = None,
+) -> "WorkflowRunOutput":
+    """Execute the linter workflow and return its results.
+
+    Runs the specified linter against provided targets, then asks the coding
+    agent to propose fixes for any issues discovered.
+    """
+    settings = get_agent_settings()
+    if not settings.openai_api_key:
+        raise AgentConfigurationError
+
+    instructions = load_prompt("coding_agent")
+    agent = cast(
+        "SupportsAgentRun",
+        create_coding_agent(settings=settings, instructions=instructions),
+    )
+
+    workflow = create_linter_workflow(
+        config=LinterWorkflowConfig(
+            linter_command=linter_command,
+            targets=targets,
+            project_path=project_path,
+            fix_instructions=fix_instructions,
+        ),
+        fix_runner=lambda prompt: _coerce_response_to_string(agent.run(prompt)),
     )
 
     return workflow.run()
