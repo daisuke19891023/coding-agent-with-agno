@@ -16,6 +16,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import logging
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:  # pragma: no cover - types only
     from clean_interfaces.utils.settings import AgentSettings
 
@@ -61,7 +63,7 @@ def _build_azure_openai_model(settings: "AgentSettings") -> Any:
             model_class = getattr(module, "AzureOpenAIChat")
             break
         except Exception as exc:  # pragma: no cover - optional integration
-            logging.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
+            logger.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
@@ -104,7 +106,7 @@ def _build_anthropic_model(settings: "AgentSettings") -> Any:
             model_class = getattr(module, "AnthropicChat")
             break
         except Exception as exc:  # pragma: no cover - optional integration
-            logging.debug("AnthropicChat import failed from %s: %s", path, exc)
+            logger.debug("AnthropicChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
@@ -135,7 +137,7 @@ def _build_gemini_model(settings: "AgentSettings") -> Any:
             model_class = getattr(module, "GeminiChat")
             break
         except Exception as exc:  # pragma: no cover - optional integration
-            logging.debug("GeminiChat import failed from %s: %s", path, exc)
+            logger.debug("GeminiChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
