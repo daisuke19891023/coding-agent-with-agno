@@ -11,9 +11,13 @@ from clean_interfaces.agents import (
 )
 from clean_interfaces.prompts import load_prompt
 from clean_interfaces.utils.settings import get_agent_settings, get_mcp_settings
+from clean_interfaces.workflow import create_tdd_workflow
+from clean_interfaces.workflow.tdd import TDDWorkflowConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from agno.run.workflow import WorkflowRunOutput
 
 
 class AgentConfigurationError(RuntimeError):
@@ -129,6 +133,38 @@ def run_serena_coder_agent(
         raise AgentExecutionError(str(exc)) from exc
 
     return _coerce_response_to_string(result)
+
+
+def run_tdd_workflow(
+    *,
+    exploration_prompt: str,
+    test_prompt: str,
+    implementation_prompt: str,
+    test_command: str,
+    project_path: Path | None = None,
+) -> WorkflowRunOutput:
+    """Execute the end-to-end TDD workflow."""
+    settings = get_agent_settings()
+    if not settings.openai_api_key:
+        raise AgentConfigurationError
+
+    workflow = create_tdd_workflow(
+        config=TDDWorkflowConfig(
+            exploration_prompt=exploration_prompt,
+            test_prompt=test_prompt,
+            implementation_prompt=implementation_prompt,
+            test_command=test_command,
+            project_path=project_path,
+        ),
+        exploration_runner=lambda prompt, path: run_serena_coder_agent(
+            prompt,
+            project_path=path,
+        ),
+        test_writer_runner=run_coding_agent,
+        implementation_runner=run_coding_agent,
+    )
+
+    return workflow.run()
 
 
 def _coerce_response_to_string(result: SupportsStringContent | str | object) -> str:
