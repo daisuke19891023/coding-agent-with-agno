@@ -39,6 +39,7 @@ dev = [
     "responses>=0.25.3",
     "pexpect>=4.9.0",
     "pytest-asyncio>=0.23.0",
+    "langwatch-scenario>=0.7.11",
     "diff-cover>=8.0.0",
     "commitizen>=3.20.0",
     "python-semantic-release>=8.10.0",
@@ -150,11 +151,12 @@ reportMissingTypeStubs = false
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "-v -ra --strict-markers" # This will be replaced by setup.sh
+addopts = "-v -ra --strict-markers -m 'not scenario'" # This will be replaced by setup.sh
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
   "integration: marks integration tests",
-  "asyncio: marks tests as asyncio"
+  "asyncio: marks tests as asyncio",
+  "scenario: marks Scenario-based tests that require external LLM credentials",
 ]
 
 [dependency-groups]
