@@ -11,6 +11,7 @@ from clean_interfaces.core import (
     AgentExecutionError,
     run_coding_agent,
     run_repository_qa_agent,
+    run_serena_coder_agent,
 )
 from clean_interfaces.models.io import WelcomeMessage
 
@@ -50,6 +51,7 @@ class CLIInterface(BaseInterface):
         self.app.command(name="welcome")(self.welcome)
         self.app.command(name="agent")(self.agent)
         self.app.command(name="repo-agent")(self.repo_agent)
+        self.app.command(name="serena-agent")(self.serena_agent)
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -127,6 +129,48 @@ class CLIInterface(BaseInterface):
 
         try:
             response_text = run_repository_qa_agent(prompt, project_path=project_path)
+        except AgentConfigurationError as exc:
+            console.print(
+                "[red]OpenAI API key not configured. "
+                "Set the OPENAI_API_KEY environment variable.[/red]",
+            )
+            self.logger.error("Agent configuration error", error=str(exc))
+            raise typer.Exit(1) from exc
+        except AgentExecutionError as exc:  # pragma: no cover - agno handles specifics
+            self.logger.error("Agent execution failed", error=str(exc))
+            console.print(f"[red]Failed to generate response: {exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        console.print(response_text)
+        console.file.flush()
+
+    def serena_agent(
+        self,
+        prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt to send to the Serena coding agent."),
+        ],
+        project_path: Annotated[
+            Path | None,
+            typer.Option(
+                "--path",
+                "-p",
+                exists=True,
+                file_okay=False,
+                dir_okay=True,
+                help="Optional project directory to modify using Serena.",
+            ),
+        ] = None,
+    ) -> None:
+        """Generate a response using the Serena-powered coding agent."""
+        self.logger.info(
+            "Running Serena coding agent",
+            prompt=prompt,
+            project_path=str(project_path) if project_path else None,
+        )
+
+        try:
+            response_text = run_serena_coder_agent(prompt, project_path=project_path)
         except AgentConfigurationError as exc:
             console.print(
                 "[red]OpenAI API key not configured. "

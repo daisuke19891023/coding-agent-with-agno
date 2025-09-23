@@ -10,6 +10,7 @@ from clean_interfaces.core import (
     AgentExecutionError,
     run_coding_agent,
     run_repository_qa_agent,
+    run_serena_coder_agent,
 )
 
 
@@ -130,3 +131,64 @@ def test_run_repo_agent_wraps_execution_errors(tmp_path: Path) -> None:
 
         with pytest.raises(AgentExecutionError):
             run_repository_qa_agent("Where is config?", project_path=tmp_path)
+
+
+def test_run_serena_agent_requires_api_key() -> None:
+    """The Serena coding agent should validate configuration before running."""
+    with patch("clean_interfaces.core.get_agent_settings") as mock_get_settings:
+        settings = MagicMock()
+        settings.openai_api_key = None
+        mock_get_settings.return_value = settings
+
+        with pytest.raises(AgentConfigurationError):
+            run_serena_coder_agent("hello")
+
+
+def test_run_serena_agent_invokes_agent_successfully(tmp_path: Path) -> None:
+    """The Serena coding agent should invoke the MCP-backed agent and return text."""
+    with (
+        patch("clean_interfaces.core.get_agent_settings") as mock_get_settings,
+        patch("clean_interfaces.core.get_mcp_settings") as mock_get_mcp_settings,
+        patch("clean_interfaces.core.load_prompt") as mock_load_prompt,
+        patch("clean_interfaces.core.create_serena_coder_agent") as mock_create_agent,
+    ):
+        settings = MagicMock()
+        settings.openai_api_key = "sk-test"
+        mock_get_settings.return_value = settings
+        mock_get_mcp_settings.return_value = MagicMock()
+        mock_load_prompt.return_value = "Serena prompt"
+
+        agent_instance = MagicMock()
+        result = MagicMock()
+        result.get_content_as_string.return_value = "Serena response"
+        agent_instance.run.return_value = result
+        mock_create_agent.return_value = agent_instance
+
+        response = run_serena_coder_agent("Add feature", project_path=tmp_path)
+
+        mock_load_prompt.assert_called_once_with("serena_coder_agent")
+        mock_create_agent.assert_called_once()
+        agent_instance.run.assert_called_once_with("Add feature")
+        assert response == "Serena response"
+
+
+def test_run_serena_agent_wraps_execution_errors(tmp_path: Path) -> None:
+    """Execution failures should be wrapped in domain-specific errors."""
+    with (
+        patch("clean_interfaces.core.get_agent_settings") as mock_get_settings,
+        patch("clean_interfaces.core.get_mcp_settings") as mock_get_mcp_settings,
+        patch("clean_interfaces.core.load_prompt") as mock_load_prompt,
+        patch("clean_interfaces.core.create_serena_coder_agent") as mock_create_agent,
+    ):
+        settings = MagicMock()
+        settings.openai_api_key = "sk-test"
+        mock_get_settings.return_value = settings
+        mock_get_mcp_settings.return_value = MagicMock()
+        mock_load_prompt.return_value = "Serena prompt"
+
+        agent_instance = MagicMock()
+        agent_instance.run.side_effect = RuntimeError("boom")
+        mock_create_agent.return_value = agent_instance
+
+        with pytest.raises(AgentExecutionError):
+            run_serena_coder_agent("Add feature", project_path=tmp_path)
