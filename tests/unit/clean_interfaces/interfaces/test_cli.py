@@ -2,10 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import typer
 
 from clean_interfaces.interfaces.base import BaseInterface
 from clean_interfaces.interfaces.cli import CLIInterface
+from clean_interfaces.core import AgentConfigurationError
 
 
 class TestCLIInterface:
@@ -53,3 +55,35 @@ class TestCLIInterface:
         cli.run()
 
         cli.app.assert_called_once()
+
+    def test_cli_agent_requires_api_key(self) -> None:
+        """The agent command should exit when the API key is missing."""
+        cli = CLIInterface()
+
+        with patch("clean_interfaces.interfaces.cli.console") as mock_console, patch(
+            "clean_interfaces.interfaces.cli.run_coding_agent",
+        ) as mock_run:
+            mock_run.side_effect = AgentConfigurationError("missing key")
+
+            with pytest.raises(typer.Exit):
+                cli.agent("hello")
+
+            mock_console.print.assert_called_once()
+
+    def test_cli_agent_generates_response(self) -> None:
+        """The agent command should call agno and print the response."""
+        cli = CLIInterface()
+
+        with (
+            patch("clean_interfaces.interfaces.cli.console") as mock_console,
+            patch("clean_interfaces.interfaces.cli.run_coding_agent") as mock_run,
+        ):
+            mock_run.return_value = "Agent response"
+
+            mock_console.file = MagicMock()
+
+            cli.agent("Write code")
+
+            mock_run.assert_called_once_with("Write code")
+            mock_console.print.assert_any_call("Agent response")
+            mock_console.file.flush.assert_called_once()
