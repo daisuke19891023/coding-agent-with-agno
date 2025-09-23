@@ -57,7 +57,7 @@ def run_coding_agent(prompt: str) -> str:
     )
 
     try:
-        result = agent.run(prompt, stream=False)
+        result = agent.run(prompt)
     except Exception as exc:  # pragma: no cover - agno handles specifics internally
         raise AgentExecutionError(str(exc)) from exc
 
@@ -71,6 +71,13 @@ def _coerce_response_to_string(result: SupportsStringContent | str | object) -> 
 
     if isinstance(result, SupportsStringContent):
         return result.get_content_as_string()
+
+    get_content: Any = getattr(result, "get_content_as_string", None)
+    if callable(get_content):
+        coerced = get_content()
+        if isinstance(coerced, str):
+            return coerced
+        return str(coerced)
 
     return str(result)
 
