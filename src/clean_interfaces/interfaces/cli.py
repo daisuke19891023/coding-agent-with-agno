@@ -12,8 +12,10 @@ from clean_interfaces.core import (
     run_coding_agent,
     run_repository_qa_agent,
     run_serena_coder_agent,
+    run_tdd_workflow,
 )
 from clean_interfaces.models.io import WelcomeMessage
+from clean_interfaces.workflow import TestCommandExecutionError
 
 from .base import BaseInterface
 
@@ -52,6 +54,7 @@ class CLIInterface(BaseInterface):
         self.app.command(name="agent")(self.agent)
         self.app.command(name="repo-agent")(self.repo_agent)
         self.app.command(name="serena-agent")(self.serena_agent)
+        self.app.command(name="tdd")(self.tdd)
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -184,6 +187,101 @@ class CLIInterface(BaseInterface):
             raise typer.Exit(1) from exc
 
         console.print(response_text)
+        console.file.flush()
+
+    def tdd(
+        self,
+        exploration_prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt to drive the initial code exploration."),
+        ],
+        test_prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt for the coding agent to design tests."),
+        ],
+        implementation_prompt: Annotated[
+            str,
+            typer.Argument(help="Prompt for implementing production code."),
+        ],
+        test_command: Annotated[
+            str,
+            typer.Option(
+                "--test-command",
+                "-t",
+                help=(
+                    "Test command to execute during the workflow. Use aliases like"
+                    " 'pytest' or provide a full shell command."
+                ),
+            ),
+        ] = "pytest",
+        project_path: Annotated[
+            Path | None,
+            typer.Option(
+                "--path",
+                "-p",
+                exists=True,
+                file_okay=False,
+                dir_okay=True,
+                help="Optional project directory for the workflow to operate in.",
+            ),
+        ] = None,
+    ) -> None:
+        """Run the agentic TDD workflow."""
+        self.logger.info(
+            "Running TDD workflow",
+            exploration_prompt=exploration_prompt,
+            test_prompt=test_prompt,
+            implementation_prompt=implementation_prompt,
+            test_command=test_command,
+            project_path=str(project_path) if project_path else None,
+        )
+
+        try:
+            workflow_run = run_tdd_workflow(
+                exploration_prompt=exploration_prompt,
+                test_prompt=test_prompt,
+                implementation_prompt=implementation_prompt,
+                test_command=test_command,
+                project_path=project_path,
+            )
+        except AgentConfigurationError as exc:
+            console.print(
+                "[red]OpenAI API key not configured. "
+                "Set the OPENAI_API_KEY environment variable.[/red]",
+            )
+            self.logger.error("Agent configuration error", error=str(exc))
+            raise typer.Exit(1) from exc
+        except AgentExecutionError as exc:
+            self.logger.error("Agent execution failed", error=str(exc))
+            console.print(f"[red]Failed to run workflow: {exc}[/red]")
+            raise typer.Exit(1) from exc
+        except TestCommandExecutionError as exc:
+            self.logger.error("Test command execution failed", error=str(exc))
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+
+        step_results = list(workflow_run.step_results or [])
+        for step in step_results:
+            step_name = getattr(step, "step_name", None) or "Workflow step"
+            console.rule(step_name)
+            content = getattr(step, "content", None)
+            if isinstance(content, str):
+                console.print(content)
+            elif content is not None:
+                console.print(str(content))
+
+        final_content = workflow_run.content
+        if isinstance(final_content, str):
+            last_content = (
+                getattr(step_results[-1], "content", None) if step_results else None
+            )
+            if not step_results or final_content != last_content:
+                console.rule("Workflow summary")
+                console.print(final_content)
+        elif final_content is not None and not step_results:
+            console.rule("Workflow summary")
+            console.print(str(final_content))
+
         console.file.flush()
 
     def run(self) -> None:
