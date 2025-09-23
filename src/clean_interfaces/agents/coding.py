@@ -11,7 +11,8 @@ from clean_interfaces.utils.settings import AgentSettings
 def create_coding_agent(*, settings: AgentSettings, instructions: str) -> Agent:
     """Create a configured agno coding agent instance."""
     if getattr(settings, "provider", "openai") == "openai":
-        # Keep direct OpenAIChat usage so existing tests that patch this symbol continue to work
+        # Keep direct OpenAIChat usage so existing tests that patch this symbol
+        # continue to work
         model = OpenAIChat(id=settings.openai_model, api_key=settings.openai_api_key)
     else:
         model = create_model(settings)

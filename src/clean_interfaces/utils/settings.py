@@ -170,7 +170,8 @@ class AgentSettings(BaseSettings):
     provider: Literal["openai", "azure_openai", "anthropic", "gemini"] = Field(
         default="openai",
         description=(
-            "LLM provider to use for agent models: openai, azure_openai, anthropic, gemini."
+            "LLM provider for agent models: openai, azure_openai, anthropic, "
+            "gemini."
         ),
     )
 

@@ -14,6 +14,7 @@ Notes:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+import logging
 
 if TYPE_CHECKING:  # pragma: no cover - types only
     from clean_interfaces.utils.settings import AgentSettings
@@ -59,7 +60,8 @@ def _build_azure_openai_model(settings: "AgentSettings") -> Any:
             module = __import__(path, fromlist=["AzureOpenAIChat"])  # type: ignore[assignment]
             model_class = getattr(module, "AzureOpenAIChat")
             break
-        except Exception:  # pragma: no cover - optional integration
+        except Exception as exc:  # pragma: no cover - optional integration
+            logging.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
@@ -80,7 +82,8 @@ def _build_azure_openai_model(settings: "AgentSettings") -> Any:
         missing.append("AZURE_OPENAI_DEPLOYMENT")
     if missing:  # pragma: no cover - validated upstream usually
         joined = ", ".join(missing)
-        raise ValueError(f"Missing Azure OpenAI settings: {joined}")
+        msg = "Missing Azure OpenAI settings: " + joined
+        raise ValueError(msg)
 
     return model_class(
         endpoint=settings.azure_openai_endpoint,
@@ -100,7 +103,8 @@ def _build_anthropic_model(settings: "AgentSettings") -> Any:
             module = __import__(path, fromlist=["AnthropicChat"])  # type: ignore[assignment]
             model_class = getattr(module, "AnthropicChat")
             break
-        except Exception:  # pragma: no cover - optional integration
+        except Exception as exc:  # pragma: no cover - optional integration
+            logging.debug("AnthropicChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
@@ -130,7 +134,8 @@ def _build_gemini_model(settings: "AgentSettings") -> Any:
             module = __import__(path, fromlist=["GeminiChat"])  # type: ignore[assignment]
             model_class = getattr(module, "GeminiChat")
             break
-        except Exception:  # pragma: no cover - optional integration
+        except Exception as exc:  # pragma: no cover - optional integration
+            logging.debug("GeminiChat import failed from %s: %s", path, exc)
             continue
 
     if model_class is None:  # pragma: no cover - optional integration
@@ -171,5 +176,6 @@ def create_model(settings: "AgentSettings") -> Any:
         return _build_anthropic_model(settings)
     if provider == "gemini":
         return _build_gemini_model(settings)
-    raise ValueError(f"Unsupported LLM provider: {provider}")
+    msg = "Unsupported LLM provider: " + str(provider)
+    raise ValueError(msg)
 
