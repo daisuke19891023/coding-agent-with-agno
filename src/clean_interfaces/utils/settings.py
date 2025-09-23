@@ -166,6 +166,14 @@ class AgentSettings(BaseSettings):
         env_prefix="AGNO_",
     )
 
+    # Provider selection
+    provider: Literal["openai", "azure_openai", "anthropic", "gemini"] = Field(
+        default="openai",
+        description=(
+            "LLM provider to use for agent models: openai, azure_openai, anthropic, gemini."
+        ),
+    )
+
     openai_api_key: str | None = Field(
         default=None,
         validation_alias="OPENAI_API_KEY",
@@ -174,6 +182,65 @@ class AgentSettings(BaseSettings):
     openai_model: str = Field(
         default="gpt-4o-mini",
         description="Default OpenAI model identifier for agno agents.",
+    )
+    openai_base_url: str | None = Field(
+        default=None,
+        validation_alias="OPENAI_BASE_URL",
+        description="Optional custom base URL for OpenAI-compatible endpoints.",
+    )
+
+    # Azure OpenAI
+    azure_openai_api_key: str | None = Field(
+        default=None,
+        validation_alias="AZURE_OPENAI_API_KEY",
+        description="Azure OpenAI API key (uses 'api-key' header).",
+    )
+    azure_openai_endpoint: str | None = Field(
+        default=None,
+        validation_alias="AZURE_OPENAI_ENDPOINT",
+        description="Azure OpenAI endpoint, e.g. https://<name>.openai.azure.com/",
+    )
+    azure_openai_api_version: str | None = Field(
+        default=None,
+        validation_alias="AZURE_OPENAI_API_VERSION",
+        description="Azure OpenAI API version, e.g. 2024-05-01-preview.",
+    )
+    azure_openai_deployment: str | None = Field(
+        default=None,
+        validation_alias="AZURE_OPENAI_DEPLOYMENT",
+        description="Azure OpenAI deployment name (used instead of model id).",
+    )
+
+    # Anthropic
+    anthropic_api_key: str | None = Field(
+        default=None,
+        validation_alias="ANTHROPIC_API_KEY",
+        description="Anthropic API key.",
+    )
+    anthropic_model: str = Field(
+        default="claude-3-5-sonnet-latest",
+        description="Default Anthropic model identifier.",
+    )
+    anthropic_base_url: str | None = Field(
+        default=None,
+        validation_alias="ANTHROPIC_BASE_URL",
+        description="Optional Anthropic base URL.",
+    )
+
+    # Google Gemini
+    gemini_api_key: str | None = Field(
+        default=None,
+        validation_alias="GEMINI_API_KEY",
+        description="Google Gemini API key.",
+    )
+    gemini_model: str = Field(
+        default="gemini-1.5-pro",
+        description="Default Google Gemini model identifier.",
+    )
+    gemini_base_url: str | None = Field(
+        default=None,
+        validation_alias="GEMINI_BASE_URL",
+        description="Optional Gemini base URL.",
     )
     agent_name: str = Field(
         default="Clean Interfaces Agent",
