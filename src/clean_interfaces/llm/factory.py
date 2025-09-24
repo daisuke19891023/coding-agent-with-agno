@@ -9,6 +9,7 @@ Notes:
   to preserve existing test hooks that patch that symbol in those modules.
 - For other providers, this factory returns the appropriate model instance if
   the corresponding integration is available in ``agno``.
+
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ class LLMProviderNotAvailableError(RuntimeError):
     """Raised when the requested provider integration is not available."""
 
 
-def _build_openai_model(settings: "AgentSettings") -> Any:
+def _build_openai_model(settings: AgentSettings) -> Any:
     """Construct an OpenAIChat model using OpenAI credentials.
 
     Although agents instantiate OpenAI models directly, this is exposed for
@@ -48,7 +49,7 @@ def _build_openai_model(settings: "AgentSettings") -> Any:
     return OpenAIChat(**kwargs)
 
 
-def _build_azure_openai_model(settings: "AgentSettings") -> Any:
+def _build_azure_openai_model(settings: AgentSettings) -> Any:
     """Construct an Azure OpenAI model instance.
 
     Attempts multiple import paths to accommodate possible agno versions.
@@ -60,7 +61,7 @@ def _build_azure_openai_model(settings: "AgentSettings") -> Any:
     ):
         try:
             module = __import__(path, fromlist=["AzureOpenAIChat"])  # type: ignore[assignment]
-            model_class = getattr(module, "AzureOpenAIChat")
+            model_class = module.AzureOpenAIChat
             break
         except Exception as exc:  # pragma: no cover - optional integration
             logger.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
@@ -95,7 +96,7 @@ def _build_azure_openai_model(settings: "AgentSettings") -> Any:
     )
 
 
-def _build_anthropic_model(settings: "AgentSettings") -> Any:
+def _build_anthropic_model(settings: AgentSettings) -> Any:
     """Construct an Anthropic model instance."""
     model_class: Any | None = None
     for path in (
@@ -103,7 +104,7 @@ def _build_anthropic_model(settings: "AgentSettings") -> Any:
     ):
         try:
             module = __import__(path, fromlist=["AnthropicChat"])  # type: ignore[assignment]
-            model_class = getattr(module, "AnthropicChat")
+            model_class = module.AnthropicChat
             break
         except Exception as exc:  # pragma: no cover - optional integration
             logger.debug("AnthropicChat import failed from %s: %s", path, exc)
@@ -125,7 +126,7 @@ def _build_anthropic_model(settings: "AgentSettings") -> Any:
     return model_class(**kwargs)
 
 
-def _build_gemini_model(settings: "AgentSettings") -> Any:
+def _build_gemini_model(settings: AgentSettings) -> Any:
     """Construct a Google Gemini model instance."""
     model_class: Any | None = None
     for path in (
@@ -134,7 +135,7 @@ def _build_gemini_model(settings: "AgentSettings") -> Any:
     ):
         try:
             module = __import__(path, fromlist=["GeminiChat"])  # type: ignore[assignment]
-            model_class = getattr(module, "GeminiChat")
+            model_class = module.GeminiChat
             break
         except Exception as exc:  # pragma: no cover - optional integration
             logger.debug("GeminiChat import failed from %s: %s", path, exc)
@@ -156,7 +157,7 @@ def _build_gemini_model(settings: "AgentSettings") -> Any:
     return model_class(**kwargs)
 
 
-def create_model(settings: "AgentSettings") -> Any:
+def create_model(settings: AgentSettings) -> Any:
     """Create a provider-specific agno model instance.
 
     Args:
@@ -168,6 +169,7 @@ def create_model(settings: "AgentSettings") -> Any:
     Raises:
         LLMProviderNotAvailableError: If the provider's model is not available.
         ValueError: If the provider is unsupported or configuration is incomplete.
+
     """
     provider = getattr(settings, "provider", "openai")
     if provider == "openai":
