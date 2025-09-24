@@ -28,16 +28,16 @@ class LLMProviderNotAvailableError(RuntimeError):
 
 
 def _build_openai_model(settings: AgentSettings) -> Any:
-    """Construct an OpenAIChat model using OpenAI credentials.
+    """Construct an OpenAI Responses model using OpenAI credentials.
 
     Although agents instantiate OpenAI models directly, this is exposed for
     completeness and potential reuse.
     """
     # Import locally to avoid hard dependency at module import time
     try:
-        from agno.models.openai import OpenAIChat
+        from agno.models.openai.responses import OpenAIResponses
     except Exception as exc:  # pragma: no cover - environment dependent
-        msg = "OpenAI model integration is not available in agno."
+        msg = "OpenAI Responses integration is not available in agno."
         raise LLMProviderNotAvailableError(msg) from exc
 
     kwargs: dict[str, Any] = {
@@ -46,31 +46,47 @@ def _build_openai_model(settings: AgentSettings) -> Any:
     }
     if getattr(settings, "openai_base_url", None):
         kwargs["base_url"] = settings.openai_base_url  # type: ignore[assignment]
-    return OpenAIChat(**kwargs)
+    return OpenAIResponses(**kwargs)
 
 
 def _build_azure_openai_model(settings: AgentSettings) -> Any:
-    """Construct an Azure OpenAI model instance.
+    """Construct an Azure OpenAI Responses model instance.
 
     Attempts multiple import paths to accommodate possible agno versions.
     """
     model_class: Any | None = None
-    for path in (
-        "agno.models.azure_openai",
-        "agno.models.azure",
-    ):
+    # Prefer Responses API
+    response_imports = (
+        ("agno.models.azure_openai.responses", "AzureOpenAIResponses"),
+        ("agno.models.azure.responses", "AzureOpenAIResponses"),
+        ("agno.models.azure_openai", "AzureOpenAIResponses"),
+        ("agno.models.azure", "AzureOpenAIResponses"),
+    )
+    for path, class_name in response_imports:
         try:
-            module = __import__(path, fromlist=["AzureOpenAIChat"])  # type: ignore[assignment]
-            model_class = module.AzureOpenAIChat
+            module = __import__(path, fromlist=[class_name])  # type: ignore[assignment]
+            model_class = getattr(module, class_name)
             break
         except Exception as exc:  # pragma: no cover - optional integration
-            logger.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
+            logger.debug("%s import failed from %s: %s", class_name, path, exc)
             continue
+
+    # Fallback to legacy Chat class if Responses not available
+    if model_class is None:
+        for path in ("agno.models.azure_openai", "agno.models.azure"):
+            try:
+                module = __import__(path, fromlist=["AzureOpenAIChat"])  # type: ignore[assignment]
+                model_class = getattr(module, "AzureOpenAIChat")
+                logger.debug("Falling back to AzureOpenAIChat from %s", path)
+                break
+            except Exception as exc:  # pragma: no cover - optional integration
+                logger.debug("AzureOpenAIChat import failed from %s: %s", path, exc)
+                continue
 
     if model_class is None:  # pragma: no cover - optional integration
         msg = (
             "Azure OpenAI integration is not available in agno. "
-            "Install a version that provides AzureOpenAIChat."
+            "Install a version that provides AzureOpenAIResponses."
         )
         raise LLMProviderNotAvailableError(msg)
 

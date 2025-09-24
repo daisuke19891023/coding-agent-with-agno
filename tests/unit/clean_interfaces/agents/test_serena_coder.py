@@ -25,14 +25,14 @@ def test_serena_coder_agent_attaches_serena_toolkit(tmp_path: Path) -> None:
         patch(
             "clean_interfaces.agents.serena_coder.create_lsp_walker",
         ) as mock_walker_factory,
-        patch("clean_interfaces.agents.serena_coder.OpenAIChat") as mock_openai_chat,
+        patch("clean_interfaces.agents.serena_coder.OpenAIResponses") as mock_openai_responses,
     ):
         walker_instance = MagicMock()
         walker_instance.create_toolkit.return_value = fake_tool
         mock_walker_factory.return_value = walker_instance
 
         model_instance = MagicMock()
-        mock_openai_chat.return_value = model_instance
+        mock_openai_responses.return_value = model_instance
 
         agent = create_serena_coder_agent(
             settings=settings,
@@ -43,7 +43,7 @@ def test_serena_coder_agent_attaches_serena_toolkit(tmp_path: Path) -> None:
 
     mock_walker_factory.assert_called_once_with(mcp_settings, project_path=tmp_path)
     walker_instance.create_toolkit.assert_called_once()
-    mock_openai_chat.assert_called_once_with(id="gpt", api_key="sk-test")
+    mock_openai_responses.assert_called_once_with(id="gpt", api_key="sk-test")
 
     assert agent.model is model_instance
     assert agent.name == "Serena"
