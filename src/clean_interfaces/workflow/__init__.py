@@ -6,6 +6,9 @@ from .test_commands import (
     TestCommandExecutor,
     TestCommandManager,
     TestCommandResult,
+    WorkflowCommandConfig,
+    create_manager_from_config,
+    load_workflow_command_config,
 )
 
 __all__ = [
@@ -13,5 +16,8 @@ __all__ = [
     "TestCommandExecutor",
     "TestCommandManager",
     "TestCommandResult",
+    "WorkflowCommandConfig",
+    "create_manager_from_config",
     "create_tdd_workflow",
+    "load_workflow_command_config",
 ]
