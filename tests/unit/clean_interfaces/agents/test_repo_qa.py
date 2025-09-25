@@ -25,7 +25,9 @@ def test_repository_qa_agent_configures_model_and_tools(tmp_path: Path) -> None:
         patch(
             "clean_interfaces.agents.repo_qa.create_lsp_walker",
         ) as mock_walker_factory,
-        patch("clean_interfaces.agents.repo_qa.OpenAIResponses") as mock_openai_responses,
+        patch(
+            "clean_interfaces.agents.repo_qa.OpenAIResponses",
+        ) as mock_openai_responses,
     ):
         walker_instance = MagicMock()
         walker_instance.create_toolkit.return_value = fake_tool

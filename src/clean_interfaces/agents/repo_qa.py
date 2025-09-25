@@ -25,7 +25,10 @@ def create_repository_qa_agent(
 ) -> Agent:
     """Create an agent configured for repository exploration."""
     if getattr(settings, "provider", "openai") == "openai":
-        model = OpenAIResponses(id=settings.openai_model, api_key=settings.openai_api_key)
+        model = OpenAIResponses(
+            id=settings.openai_model,
+            api_key=settings.openai_api_key,
+        )
     else:
         model = create_model(settings)
 

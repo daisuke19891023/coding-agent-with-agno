@@ -25,7 +25,9 @@ def test_serena_coder_agent_attaches_serena_toolkit(tmp_path: Path) -> None:
         patch(
             "clean_interfaces.agents.serena_coder.create_lsp_walker",
         ) as mock_walker_factory,
-        patch("clean_interfaces.agents.serena_coder.OpenAIResponses") as mock_openai_responses,
+        patch(
+            "clean_interfaces.agents.serena_coder.OpenAIResponses",
+        ) as mock_openai_responses,
     ):
         walker_instance = MagicMock()
         walker_instance.create_toolkit.return_value = fake_tool
