@@ -16,6 +16,7 @@ dependencies = [
     "typer>=0.16.0",
     "fastmcp>=2.12.2",
     "openai>=1.108.0",
+    "tomli-w>=1.0.0",
 ] # Populated by user or later steps if needed
 
 [project.scripts]
