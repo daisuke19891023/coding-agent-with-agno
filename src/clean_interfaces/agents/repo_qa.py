@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
+from agno.models.openai.responses import OpenAIResponses
 
 from clean_interfaces.mcp import create_lsp_walker
 from clean_interfaces.llm import create_model
@@ -25,7 +25,10 @@ def create_repository_qa_agent(
 ) -> Agent:
     """Create an agent configured for repository exploration."""
     if getattr(settings, "provider", "openai") == "openai":
-        model = OpenAIChat(id=settings.openai_model, api_key=settings.openai_api_key)
+        model = OpenAIResponses(
+            id=settings.openai_model,
+            api_key=settings.openai_api_key,
+        )
     else:
         model = create_model(settings)
 
