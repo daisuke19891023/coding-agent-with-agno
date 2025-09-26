@@ -184,7 +184,6 @@ class TestCLIInterface:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """The mcp add command should persist configuration to TOML."""
-
         config_root = tmp_path / "config"
         monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
 
@@ -213,7 +212,6 @@ class TestCLIInterface:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """The mcp list command should emit JSON when requested."""
-
         config_root = tmp_path / "config"
         monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
 
@@ -237,12 +235,15 @@ class TestCLIInterface:
                     "env": None,
                     "startup_timeout_sec": None,
                     "tool_timeout_sec": None,
-                }
+                },
             ]
 
-    def test_cli_mcp_remove_missing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_cli_mcp_remove_missing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Removing a non-existent MCP server should warn the user."""
-
         config_root = tmp_path / "config"
         monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
 
@@ -254,6 +255,6 @@ class TestCLIInterface:
             cli.mcp_remove("missing")
 
             mock_console.print.assert_called_with(
-                "[yellow]No MCP server named 'missing' found.[/yellow]"
+                "[yellow]No MCP server named 'missing' found.[/yellow]",
             )
             mock_console.file.flush.assert_called_once()

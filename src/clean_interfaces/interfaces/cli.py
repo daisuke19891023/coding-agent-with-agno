@@ -310,7 +310,6 @@ class CLIInterface(BaseInterface):
 
     def _handle_mcp_error(self, action: str, exc: MCPConfigError) -> None:
         """Log an MCP configuration error and exit."""
-
         console.print(f"[red]{action}: {exc}[/red]")
         console.file.flush()
         self.logger.error("MCP configuration error", action=action, error=str(exc))
@@ -318,34 +317,32 @@ class CLIInterface(BaseInterface):
 
     def _parse_env_values(self, env_values: list[str]) -> dict[str, str] | None:
         """Convert repeated KEY=VALUE options into a mapping."""
-
         if not env_values:
             return None
 
         env_map: dict[str, str] = {}
         for raw in env_values:
             if "=" not in raw:
-                raise typer.BadParameter(
-                    "Environment entries must be provided as KEY=VALUE pairs.",
-                )
+                msg = "Environment entries must be provided as KEY=VALUE pairs."
+                raise typer.BadParameter(msg)
             key, value = raw.split("=", 1)
             key = key.strip()
             if not key:
-                raise typer.BadParameter(
-                    "Environment variable names cannot be empty.",
-                )
+                msg = "Environment variable names cannot be empty."
+                raise typer.BadParameter(msg)
             env_map[key] = value
         return env_map
 
     def _validate_server_name(self, name: str) -> None:
         """Ensure the server name matches the expected pattern."""
-
         if not name or not all(
             char.isalnum() or char in {"-", "_"} for char in name
         ):
-            raise typer.BadParameter(
-                "Server names must contain only letters, numbers, '-' or '_' characters.",
+            msg = (
+                "Server names must contain only letters, numbers, '-' or '_' "
+                "characters."
             )
+            raise typer.BadParameter(msg)
 
     def mcp_add(
         self,
@@ -387,10 +384,10 @@ class CLIInterface(BaseInterface):
         ] = None,
     ) -> None:
         """Add or update an MCP server entry in the config file."""
-
         self._validate_server_name(name)
         if not command:
-            raise typer.BadParameter("A command to launch the MCP server is required.")
+            msg = "A command to launch the MCP server is required."
+            raise typer.BadParameter(msg)
 
         env_map = self._parse_env_values(env)
 
@@ -416,14 +413,13 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                False,
-                "--json",
+                default=False,
+                param_decls=["--json"],
                 help="Render the configured servers as JSON instead of a table.",
             ),
         ] = False,
     ) -> None:
         """List configured MCP servers."""
-
         try:
             servers = load_mcp_servers()
         except MCPConfigError as exc:
@@ -436,9 +432,11 @@ class CLIInterface(BaseInterface):
             return
 
         if not servers:
-            console.print(
-                "[yellow]No MCP servers configured. Use 'clean-interfaces mcp add' to add one.[/yellow]",
+            message = (
+                "[yellow]No MCP servers configured. Use 'clean-interfaces mcp add' "
+                "to add one.[/yellow]"
             )
+            console.print(message)
             console.file.flush()
             return
 
@@ -451,7 +449,9 @@ class CLIInterface(BaseInterface):
         for name, entry in sorted(servers.items()):
             args_display = " ".join(entry.args) if entry.args else "-"
             if entry.env:
-                env_parts = [f"{key}={value}" for key, value in sorted(entry.env.items())]
+                env_parts = [
+                    f"{key}={value}" for key, value in sorted(entry.env.items())
+                ]
                 env_display = ", ".join(env_parts)
             else:
                 env_display = "-"
@@ -469,14 +469,13 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                False,
-                "--json",
+                default=False,
+                param_decls=["--json"],
                 help="Render the server configuration as JSON.",
             ),
         ] = False,
     ) -> None:
         """Display a single MCP server configuration entry."""
-
         try:
             servers = load_mcp_servers()
         except MCPConfigError as exc:
@@ -518,7 +517,6 @@ class CLIInterface(BaseInterface):
         ],
     ) -> None:
         """Remove a configured MCP server."""
-
         try:
             removed = remove_mcp_server(name)
         except MCPConfigError as exc:

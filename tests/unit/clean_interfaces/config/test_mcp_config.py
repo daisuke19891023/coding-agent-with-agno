@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,11 +18,13 @@ try:  # pragma: no cover - fallback for older Python versions
 except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-@pytest.fixture()
+
+@pytest.fixture
 def config_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Provide an isolated configuration home for tests."""
-
     base = tmp_path / "config_home"
     monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(base))
     return base
@@ -30,13 +32,12 @@ def config_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_load_empty_when_config_missing(config_home: Path) -> None:
     """Loading configuration without a file should return an empty mapping."""
-
+    _ = config_home
     assert load_mcp_servers() == {}
 
 
 def test_save_and_reload_round_trip(config_home: Path) -> None:
     """Saving an entry should persist it to TOML and allow reloading."""
-
     entry = McpServerEntry(
         command="docs-server",
         args=["--port", "4000"],
@@ -65,7 +66,6 @@ def test_save_and_reload_round_trip(config_home: Path) -> None:
 
 def test_remove_missing_entry_returns_false(config_home: Path) -> None:
     """Removing a missing server should return False and keep the file untouched."""
-
     assert remove_mcp_server("unknown") is False
 
     config_path = config_home / "clean-interfaces" / "config.toml"

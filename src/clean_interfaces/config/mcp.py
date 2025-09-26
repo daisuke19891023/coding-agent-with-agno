@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 try:  # pragma: no cover - tomllib is present on Python >=3.11
     import tomllib
@@ -37,9 +38,8 @@ class McpServerEntry:
     extras: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> "McpServerEntry":
+    def from_mapping(cls, raw: Mapping[str, Any]) -> McpServerEntry:
         """Create an entry from a TOML mapping."""
-
         if "command" not in raw or not isinstance(raw["command"], str):
             msg = "MCP server entries must define a 'command' string"
             raise MCPConfigError(msg)
@@ -84,7 +84,6 @@ class McpServerEntry:
 
     def to_mapping(self) -> dict[str, Any]:
         """Convert the entry into a TOML-serialisable mapping."""
-
         data: dict[str, Any] = {"command": self.command, "args": list(self.args)}
 
         if self.env is not None:
@@ -103,7 +102,6 @@ class McpServerEntry:
 
     def to_json(self, name: str) -> dict[str, Any]:
         """Return a JSON-serialisable representation of the entry."""
-
         json_env = self.env if self.env is not None else None
         return {
             "name": name,
@@ -117,17 +115,16 @@ class McpServerEntry:
 
 def _optional_float(value: Any) -> float | None:
     """Return value as float if provided, otherwise None."""
-
     if value is None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    raise MCPConfigError("timeout values must be numeric")
+    msg = "timeout values must be numeric"
+    raise MCPConfigError(msg)
 
 
 def _resolve_base_dir() -> Path:
     """Return the base configuration directory."""
-
     env_dir = os.environ.get(CONFIG_ENV_VAR)
     if env_dir:
         return Path(env_dir).expanduser().resolve()
@@ -136,19 +133,16 @@ def _resolve_base_dir() -> Path:
 
 def _resolve_config_dir() -> Path:
     """Return the application configuration directory."""
-
     return _resolve_base_dir() / _APP_SUBDIR
 
 
 def _resolve_config_file() -> Path:
     """Return the path to the configuration file."""
-
     return _resolve_config_dir() / _CONFIG_FILENAME
 
 
 def _load_raw_config() -> dict[str, Any]:
     """Load the raw configuration mapping from disk."""
-
     config_path = _resolve_config_file()
     if not config_path.exists():
         return {}
@@ -157,33 +151,30 @@ def _load_raw_config() -> dict[str, Any]:
         with config_path.open("rb") as fh:
             return tomllib.load(fh)
     except (OSError, tomllib.TOMLDecodeError) as exc:  # pragma: no cover - I/O safety
-        raise MCPConfigError(
-            f"Failed to read MCP configuration from {config_path}: {exc}"
-        ) from exc
+        msg = f"Failed to read MCP configuration from {config_path}: {exc}"
+        raise MCPConfigError(msg) from exc
 
 
 def _write_raw_config(config: Mapping[str, Any]) -> None:
     """Write the provided configuration mapping to disk."""
-
     config_dir = _resolve_config_dir()
     try:
         config_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:  # pragma: no cover - I/O safety
-        raise MCPConfigError(
-            f"Failed to create config directory {config_dir}: {exc}"
-        ) from exc
+        msg = f"Failed to create config directory {config_dir}: {exc}"
+        raise MCPConfigError(msg) from exc
 
     config_path = config_dir / _CONFIG_FILENAME
     try:
         with config_path.open("wb") as fh:
             tomli_w.dump(dict(config), fh)
     except OSError as exc:  # pragma: no cover - I/O safety
-        raise MCPConfigError(f"Failed to write config file {config_path}: {exc}") from exc
+        msg = f"Failed to write config file {config_path}: {exc}"
+        raise MCPConfigError(msg) from exc
 
 
 def load_mcp_servers() -> dict[str, McpServerEntry]:
     """Return all configured MCP servers keyed by name."""
-
     raw_config = _load_raw_config()
     raw_servers = raw_config.get(_MCP_SECTION, {})
 
@@ -209,7 +200,6 @@ def load_mcp_servers() -> dict[str, McpServerEntry]:
 
 def save_mcp_server(name: str, entry: McpServerEntry) -> None:
     """Insert or update an MCP server entry."""
-
     raw_config = _load_raw_config()
     raw_servers = raw_config.get(_MCP_SECTION)
     if raw_servers is None:
@@ -229,7 +219,6 @@ def save_mcp_server(name: str, entry: McpServerEntry) -> None:
 
 def remove_mcp_server(name: str) -> bool:
     """Remove an MCP server entry by name."""
-
     raw_config = _load_raw_config()
     raw_servers = raw_config.get(_MCP_SECTION)
     if raw_servers is None:
@@ -256,7 +245,6 @@ def remove_mcp_server(name: str) -> bool:
 
 def dump_mcp_servers_json() -> str:
     """Return a JSON representation of the configured MCP servers."""
-
     servers = load_mcp_servers()
     payload = [entry.to_json(name) for name, entry in sorted(servers.items())]
     return json.dumps(payload, indent=2, ensure_ascii=False)
