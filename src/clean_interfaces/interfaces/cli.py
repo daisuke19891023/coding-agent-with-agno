@@ -364,7 +364,6 @@ class CLIInterface(BaseInterface):
         env: Annotated[
             list[str] | None,
             typer.Option(
-                None,
                 "--env",
                 help="Environment variables to set when launching the server.",
                 metavar="KEY=VALUE",
@@ -374,7 +373,6 @@ class CLIInterface(BaseInterface):
         startup_timeout_sec: Annotated[
             float | None,
             typer.Option(
-                None,
                 "--startup-timeout-sec",
                 help="Override how long to wait for the server to become ready.",
             ),
@@ -382,7 +380,6 @@ class CLIInterface(BaseInterface):
         tool_timeout_sec: Annotated[
             float | None,
             typer.Option(
-                None,
                 "--tool-timeout-sec",
                 help="Override how long individual MCP tool calls may run.",
             ),
@@ -419,12 +416,12 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the configured servers as JSON instead of a table.",
                 is_flag=True,
+                default=_JSON_FLAG_DEFAULT,
             ),
-        ] = False,
+        ] = _JSON_FLAG_DEFAULT,
     ) -> None:
         """List configured MCP servers."""
         try:
@@ -477,12 +474,12 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the server configuration as JSON.",
                 is_flag=True,
+                default=_JSON_FLAG_DEFAULT,
             ),
-        ] = False,
+        ] = _JSON_FLAG_DEFAULT,
     ) -> None:
         """Display a single MCP server configuration entry."""
         try:
