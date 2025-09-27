@@ -7,13 +7,9 @@ from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-try:  # pragma: no cover - tomllib is present on Python >=3.11
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
-
+import tomllib
 import tomli_w
 
 CONFIG_ENV_VAR = "CLEAN_INTERFACES_CONFIG_HOME"
@@ -26,16 +22,64 @@ class MCPConfigError(RuntimeError):
     """Raised when MCP configuration cannot be parsed or persisted."""
 
 
+def _new_args_list() -> list[str]:
+    """Return a new list for command arguments."""
+    return []
+
+
+def _new_extras_dict() -> dict[str, Any]:
+    """Return a new dictionary for additional values."""
+    return {}
+
+
+def _parse_args_field(raw: Mapping[str, Any]) -> list[str]:
+    """Extract the optional args field as a list of strings."""
+    args_raw = raw.get("args")
+    if args_raw is None:
+        return []
+    if not isinstance(args_raw, list):
+        msg = "'args' must be provided as a list"
+        raise MCPConfigError(msg)
+
+    args_candidates = cast("list[object]", args_raw)
+    args_list: list[str] = []
+    for item in args_candidates:
+        if not isinstance(item, str):
+            msg = "'args' must be a list of strings in MCP server entries"
+            raise MCPConfigError(msg)
+        args_list.append(item)
+    return args_list
+
+
+def _parse_env_field(raw: Mapping[str, Any]) -> dict[str, str] | None:
+    """Extract the optional env field as a mapping of strings."""
+    env_value = raw.get("env")
+    if env_value is None:
+        return None
+    if not isinstance(env_value, Mapping):
+        msg = "'env' must be provided as a mapping of string pairs"
+        raise MCPConfigError(msg)
+
+    env_map: dict[str, str] = {}
+    env_mapping = cast("Mapping[Any, Any]", env_value)
+    for key_obj, value_obj in env_mapping.items():
+        if not isinstance(key_obj, str) or not isinstance(value_obj, str):
+            msg = "'env' must be a table of string key/value pairs"
+            raise MCPConfigError(msg)
+        env_map[key_obj] = value_obj
+    return env_map
+
+
 @dataclass(slots=True)
 class McpServerEntry:
     """Representation of a configured MCP server."""
 
     command: str
-    args: list[str] = field(default_factory=list)
+    args: list[str] = field(default_factory=_new_args_list)
     env: dict[str, str] | None = None
     startup_timeout_sec: float | None = None
     tool_timeout_sec: float | None = None
-    extras: dict[str, Any] = field(default_factory=dict)
+    extras: dict[str, Any] = field(default_factory=_new_extras_dict)
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> McpServerEntry:
@@ -44,24 +88,8 @@ class McpServerEntry:
             msg = "MCP server entries must define a 'command' string"
             raise MCPConfigError(msg)
 
-        args_value = raw.get("args", [])
-        if not isinstance(args_value, list) or not all(
-            isinstance(item, str) for item in args_value
-        ):
-            msg = "'args' must be a list of strings in MCP server entries"
-            raise MCPConfigError(msg)
-
-        env_value = raw.get("env")
-        if env_value is not None:
-            if not isinstance(env_value, Mapping) or not all(
-                isinstance(key, str) and isinstance(value, str)
-                for key, value in env_value.items()
-            ):
-                msg = "'env' must be a table of string key/value pairs"
-                raise MCPConfigError(msg)
-            env_map = {str(key): str(value) for key, value in env_value.items()}
-        else:
-            env_map = None
+        args_list = _parse_args_field(raw)
+        env_map = _parse_env_field(raw)
 
         extras: dict[str, Any] = {}
         for extra_key in raw.keys() - {
@@ -75,7 +103,7 @@ class McpServerEntry:
 
         return cls(
             command=str(raw["command"]),
-            args=[str(item) for item in args_value],
+            args=args_list,
             env=env_map,
             startup_timeout_sec=_optional_float(raw.get("startup_timeout_sec")),
             tool_timeout_sec=_optional_float(raw.get("tool_timeout_sec")),
@@ -149,7 +177,8 @@ def _load_raw_config() -> dict[str, Any]:
 
     try:
         with config_path.open("rb") as fh:
-            return tomllib.load(fh)
+            data: dict[str, Any] = tomllib.load(fh)
+            return data
     except (OSError, tomllib.TOMLDecodeError) as exc:  # pragma: no cover - I/O safety
         msg = f"Failed to read MCP configuration from {config_path}: {exc}"
         raise MCPConfigError(msg) from exc
@@ -176,24 +205,28 @@ def _write_raw_config(config: Mapping[str, Any]) -> None:
 def load_mcp_servers() -> dict[str, McpServerEntry]:
     """Return all configured MCP servers keyed by name."""
     raw_config = _load_raw_config()
-    raw_servers = raw_config.get(_MCP_SECTION, {})
+    raw_servers_value = raw_config.get(_MCP_SECTION)
 
-    if raw_servers in (None, {}):
+    if raw_servers_value in (None, {}):
         return {}
 
-    if not isinstance(raw_servers, Mapping):
+    if not isinstance(raw_servers_value, Mapping):
         msg = f"'{_MCP_SECTION}' section must be a table in the config file"
         raise MCPConfigError(msg)
 
     servers: dict[str, McpServerEntry] = {}
-    for name, entry in raw_servers.items():
-        if not isinstance(name, str):
+    raw_servers = cast("Mapping[Any, Any]", raw_servers_value)
+
+    for name_obj, entry_obj in raw_servers.items():
+        if not isinstance(name_obj, str):
             msg = "Server names must be strings"
             raise MCPConfigError(msg)
-        if not isinstance(entry, Mapping):
+        name = name_obj
+        if not isinstance(entry_obj, Mapping):
             msg = f"MCP server '{name}' must be a table"
             raise MCPConfigError(msg)
-        servers[name] = McpServerEntry.from_mapping(entry)
+        entry_mapping = cast("Mapping[str, Any]", entry_obj)
+        servers[name] = McpServerEntry.from_mapping(entry_mapping)
 
     return servers
 
@@ -201,14 +234,15 @@ def load_mcp_servers() -> dict[str, McpServerEntry]:
 def save_mcp_server(name: str, entry: McpServerEntry) -> None:
     """Insert or update an MCP server entry."""
     raw_config = _load_raw_config()
-    raw_servers = raw_config.get(_MCP_SECTION)
-    if raw_servers is None:
-        raw_servers = {}
-    elif not isinstance(raw_servers, Mapping):
+    raw_servers_value = raw_config.get(_MCP_SECTION)
+    if raw_servers_value is None:
+        raw_servers: dict[str, Any] = {}
+    elif not isinstance(raw_servers_value, Mapping):
         msg = f"'{_MCP_SECTION}' section must be a table in the config file"
         raise MCPConfigError(msg)
+    else:
+        raw_servers = dict(cast("Mapping[str, Any]", raw_servers_value))
 
-    raw_servers = dict(raw_servers)
     raw_servers[name] = entry.to_mapping()
 
     updated_config = dict(raw_config)
@@ -220,14 +254,14 @@ def save_mcp_server(name: str, entry: McpServerEntry) -> None:
 def remove_mcp_server(name: str) -> bool:
     """Remove an MCP server entry by name."""
     raw_config = _load_raw_config()
-    raw_servers = raw_config.get(_MCP_SECTION)
-    if raw_servers is None:
+    raw_servers_value = raw_config.get(_MCP_SECTION)
+    if raw_servers_value is None:
         return False
-    if not isinstance(raw_servers, Mapping):
+    if not isinstance(raw_servers_value, Mapping):
         msg = f"'{_MCP_SECTION}' section must be a table in the config file"
         raise MCPConfigError(msg)
 
-    mutable_servers = dict(raw_servers)
+    mutable_servers = dict(cast("Mapping[str, Any]", raw_servers_value))
     removed = mutable_servers.pop(name, None) is not None
 
     if not removed:

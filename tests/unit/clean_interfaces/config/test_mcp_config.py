@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from math import isclose
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -13,10 +14,7 @@ from clean_interfaces.config.mcp import (
     save_mcp_server,
 )
 
-try:  # pragma: no cover - fallback for older Python versions
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
+import tomllib
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,11 +51,12 @@ def test_save_and_reload_round_trip(config_home: Path) -> None:
     assert stored.command == "docs-server"
     assert stored.args == ["--port", "4000"]
     assert stored.env == {"API_KEY": "value"}
-    assert stored.startup_timeout_sec == pytest.approx(12.5)
+    assert stored.startup_timeout_sec is not None
+    assert isclose(stored.startup_timeout_sec, 12.5)
 
     config_path = config_home / "clean-interfaces" / "config.toml"
     with config_path.open("rb") as fh:
-        data = tomllib.load(fh)
+        data: dict[str, Any] = tomllib.load(fh)
 
     assert data["mcp_servers"]["docs"]["command"] == "docs-server"
     assert data["mcp_servers"]["docs"]["args"] == ["--port", "4000"]

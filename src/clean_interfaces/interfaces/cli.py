@@ -31,6 +31,8 @@ from .base import BaseInterface
 # Force terminal mode even in non-TTY environments
 console = Console(force_terminal=True, force_interactive=False)
 
+_JSON_FLAG_DEFAULT = False
+
 
 class CLIInterface(BaseInterface):
     """Command Line Interface implementation."""
@@ -403,6 +405,7 @@ class CLIInterface(BaseInterface):
             save_mcp_server(name, entry)
         except MCPConfigError as exc:
             self._handle_mcp_error("Failed to save MCP server configuration", exc)
+            return
 
         self.logger.info("Saved MCP server entry", name=name, command=command[0])
         console.print(f"[green]Added MCP server '{name}'.[/green]")
@@ -413,9 +416,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                default=False,
-                param_decls=["--json"],
+                _JSON_FLAG_DEFAULT,
+                "--json",
                 help="Render the configured servers as JSON instead of a table.",
+                is_flag=True,
             ),
         ] = False,
     ) -> None:
@@ -424,6 +428,7 @@ class CLIInterface(BaseInterface):
             servers = load_mcp_servers()
         except MCPConfigError as exc:
             self._handle_mcp_error("Failed to load MCP server configuration", exc)
+            return
 
         if json_output:
             payload = [entry.to_json(name) for name, entry in sorted(servers.items())]
@@ -469,9 +474,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                default=False,
-                param_decls=["--json"],
+                _JSON_FLAG_DEFAULT,
+                "--json",
                 help="Render the server configuration as JSON.",
+                is_flag=True,
             ),
         ] = False,
     ) -> None:
@@ -480,6 +486,7 @@ class CLIInterface(BaseInterface):
             servers = load_mcp_servers()
         except MCPConfigError as exc:
             self._handle_mcp_error("Failed to load MCP server configuration", exc)
+            return
 
         entry = servers.get(name)
         if entry is None:
@@ -521,6 +528,7 @@ class CLIInterface(BaseInterface):
             removed = remove_mcp_server(name)
         except MCPConfigError as exc:
             self._handle_mcp_error("Failed to update MCP server configuration", exc)
+            return
 
         if removed:
             self.logger.info("Removed MCP server entry", name=name)

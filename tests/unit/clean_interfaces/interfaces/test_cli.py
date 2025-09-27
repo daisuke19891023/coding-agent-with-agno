@@ -1,6 +1,7 @@
 """Tests for CLI interface implementation."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,10 +12,7 @@ from clean_interfaces.config.mcp import McpServerEntry, save_mcp_server
 from clean_interfaces.interfaces.base import BaseInterface
 from clean_interfaces.interfaces.cli import CLIInterface
 
-try:  # pragma: no cover - fallback for older Python versions
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
+import tomllib
 
 
 class TestCLIInterface:
@@ -200,7 +198,7 @@ class TestCLIInterface:
 
         config_path = config_root / "clean-interfaces" / "config.toml"
         with config_path.open("rb") as fh:
-            data = tomllib.load(fh)
+            data: dict[str, Any] = tomllib.load(fh)
 
         assert data["mcp_servers"]["docs"]["command"] == "docs-server"
         assert data["mcp_servers"]["docs"]["args"] == ["--port", "4000"]
