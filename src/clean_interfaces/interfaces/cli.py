@@ -1,7 +1,7 @@
 """CLI interface implementation using Typer."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Sequence
 
 import typer
 from rich.console import Console
@@ -317,7 +317,9 @@ class CLIInterface(BaseInterface):
         self.logger.error("MCP configuration error", action=action, error=str(exc))
         raise typer.Exit(1) from exc
 
-    def _parse_env_values(self, env_values: list[str]) -> dict[str, str] | None:
+    def _parse_env_values(
+        self, env_values: Sequence[str] | None
+    ) -> dict[str, str] | None:
         """Convert repeated KEY=VALUE options into a mapping."""
         if not env_values:
             return None
@@ -360,28 +362,29 @@ class CLIInterface(BaseInterface):
             ),
         ],
         env: Annotated[
-            list[str],
+            Sequence[str],
             typer.Option(
+                (),
                 "--env",
                 help="Environment variables to set when launching the server.",
                 metavar="KEY=VALUE",
-                default=[],
+                show_default=False,
             ),
         ],
         startup_timeout_sec: Annotated[
             float | None,
             typer.Option(
+                None,
                 "--startup-timeout-sec",
                 help="Override how long to wait for the server to become ready.",
-                default=None,
             ),
         ] = None,
         tool_timeout_sec: Annotated[
             float | None,
             typer.Option(
+                None,
                 "--tool-timeout-sec",
                 help="Override how long individual MCP tool calls may run.",
-                default=None,
             ),
         ] = None,
     ) -> None:
@@ -416,10 +419,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
+                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the configured servers as JSON instead of a table.",
                 is_flag=True,
-                default=_JSON_FLAG_DEFAULT,
             ),
         ] = False,
     ) -> None:
@@ -474,10 +477,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
+                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the server configuration as JSON.",
                 is_flag=True,
-                default=_JSON_FLAG_DEFAULT,
             ),
         ] = False,
     ) -> None:
