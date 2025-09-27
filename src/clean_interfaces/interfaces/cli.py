@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from clean_interfaces.core import (
     AgentConfigurationError,
@@ -14,6 +15,13 @@ from clean_interfaces.core import (
     run_serena_coder_agent,
     run_tdd_workflow,
 )
+from clean_interfaces.config.mcp import (
+    MCPConfigError,
+    McpServerEntry,
+    load_mcp_servers,
+    remove_mcp_server,
+    save_mcp_server,
+)
 from clean_interfaces.models.io import WelcomeMessage
 from clean_interfaces.workflow import TestCommandExecutionError
 
@@ -22,6 +30,8 @@ from .base import BaseInterface
 # Configure console for better test compatibility
 # Force terminal mode even in non-TTY environments
 console = Console(force_terminal=True, force_interactive=False)
+
+_JSON_FLAG_DEFAULT = False
 
 
 class CLIInterface(BaseInterface):
@@ -55,6 +65,18 @@ class CLIInterface(BaseInterface):
         self.app.command(name="repo-agent")(self.repo_agent)
         self.app.command(name="serena-agent")(self.serena_agent)
         self.app.command(name="tdd")(self.tdd)
+
+        # Model Context Protocol management commands
+        mcp_app = typer.Typer(
+            name="mcp",
+            help="Manage Model Context Protocol server integrations.",
+            add_completion=False,
+        )
+        mcp_app.command(name="add")(self.mcp_add)
+        mcp_app.command(name="list")(self.mcp_list)
+        mcp_app.command(name="get")(self.mcp_get)
+        mcp_app.command(name="remove")(self.mcp_remove)
+        self.app.add_typer(mcp_app, name="mcp")
 
         # Add a callback that shows welcome when no command is specified
         self.app.callback(invoke_without_command=True)(self._main_callback)
@@ -282,6 +304,237 @@ class CLIInterface(BaseInterface):
             console.rule("Workflow summary")
             console.print(str(final_content))
 
+        console.file.flush()
+
+    # ------------------------------------------------------------------
+    # MCP management helpers
+    # ------------------------------------------------------------------
+
+    def _handle_mcp_error(self, action: str, exc: MCPConfigError) -> None:
+        """Log an MCP configuration error and exit."""
+        console.print(f"[red]{action}: {exc}[/red]")
+        console.file.flush()
+        self.logger.error("MCP configuration error", action=action, error=str(exc))
+        raise typer.Exit(1) from exc
+
+    def _parse_env_values(
+        self, env_values: list[str] | None,
+    ) -> dict[str, str] | None:
+        """Convert repeated KEY=VALUE options into a mapping."""
+        if not env_values:
+            return None
+
+        env_map: dict[str, str] = {}
+        for raw in env_values:
+            if "=" not in raw:
+                msg = "Environment entries must be provided as KEY=VALUE pairs."
+                raise typer.BadParameter(msg)
+            key, value = raw.split("=", 1)
+            key = key.strip()
+            if not key:
+                msg = "Environment variable names cannot be empty."
+                raise typer.BadParameter(msg)
+            env_map[key] = value
+        return env_map
+
+    def _validate_server_name(self, name: str) -> None:
+        """Ensure the server name matches the expected pattern."""
+        if not name or not all(
+            char.isalnum() or char in {"-", "_"} for char in name
+        ):
+            msg = (
+                "Server names must contain only letters, numbers, '-' or '_' "
+                "characters."
+            )
+            raise typer.BadParameter(msg)
+
+    def mcp_add(
+        self,
+        name: Annotated[
+            str,
+            typer.Argument(help="Identifier for the MCP server configuration."),
+        ],
+        command: Annotated[
+            list[str],
+            typer.Argument(
+                help="Command used to launch the MCP server.",
+                metavar="COMMAND...",
+            ),
+        ],
+        env: Annotated[
+            list[str] | None,
+            typer.Option(
+                "--env",
+                help="Environment variables to set when launching the server.",
+                metavar="KEY=VALUE",
+                show_default=False,
+            ),
+        ] = None,
+        startup_timeout_sec: Annotated[
+            float | None,
+            typer.Option(
+                "--startup-timeout-sec",
+                help="Override how long to wait for the server to become ready.",
+            ),
+        ] = None,
+        tool_timeout_sec: Annotated[
+            float | None,
+            typer.Option(
+                "--tool-timeout-sec",
+                help="Override how long individual MCP tool calls may run.",
+            ),
+        ] = None,
+    ) -> None:
+        """Add or update an MCP server entry in the config file."""
+        self._validate_server_name(name)
+        if not command:
+            msg = "A command to launch the MCP server is required."
+            raise typer.BadParameter(msg)
+
+        env_map = self._parse_env_values(env)
+
+        entry = McpServerEntry(
+            command=command[0],
+            args=command[1:],
+            env=env_map,
+            startup_timeout_sec=startup_timeout_sec,
+            tool_timeout_sec=tool_timeout_sec,
+        )
+
+        try:
+            save_mcp_server(name, entry)
+        except MCPConfigError as exc:
+            self._handle_mcp_error("Failed to save MCP server configuration", exc)
+            return
+
+        self.logger.info("Saved MCP server entry", name=name, command=command[0])
+        console.print(f"[green]Added MCP server '{name}'.[/green]")
+        console.file.flush()
+
+    def mcp_list(
+        self,
+        json_output: Annotated[
+            bool,
+            typer.Option(
+                _JSON_FLAG_DEFAULT,
+                "--json",
+                help="Render the configured servers as JSON instead of a table.",
+                is_flag=True,
+            ),
+        ] = _JSON_FLAG_DEFAULT,
+    ) -> None:
+        """List configured MCP servers."""
+        try:
+            servers = load_mcp_servers()
+        except MCPConfigError as exc:
+            self._handle_mcp_error("Failed to load MCP server configuration", exc)
+            return
+
+        if json_output:
+            payload = [entry.to_json(name) for name, entry in sorted(servers.items())]
+            console.print_json(data=payload)
+            console.file.flush()
+            return
+
+        if not servers:
+            message = (
+                "[yellow]No MCP servers configured. Use 'clean-interfaces mcp add' "
+                "to add one.[/yellow]"
+            )
+            console.print(message)
+            console.file.flush()
+            return
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Name", style="bold")
+        table.add_column("Command")
+        table.add_column("Args")
+        table.add_column("Env")
+
+        for name, entry in sorted(servers.items()):
+            args_display = " ".join(entry.args) if entry.args else "-"
+            if entry.env:
+                env_parts = [
+                    f"{key}={value}" for key, value in sorted(entry.env.items())
+                ]
+                env_display = ", ".join(env_parts)
+            else:
+                env_display = "-"
+            table.add_row(name, entry.command, args_display, env_display)
+
+        console.print(table)
+        console.file.flush()
+
+    def mcp_get(
+        self,
+        name: Annotated[
+            str,
+            typer.Argument(help="Name of the configured MCP server to display."),
+        ],
+        json_output: Annotated[
+            bool,
+            typer.Option(
+                _JSON_FLAG_DEFAULT,
+                "--json",
+                help="Render the server configuration as JSON.",
+                is_flag=True,
+            ),
+        ] = _JSON_FLAG_DEFAULT,
+    ) -> None:
+        """Display a single MCP server configuration entry."""
+        try:
+            servers = load_mcp_servers()
+        except MCPConfigError as exc:
+            self._handle_mcp_error("Failed to load MCP server configuration", exc)
+            return
+
+        entry = servers.get(name)
+        if entry is None:
+            console.print(f"[red]No MCP server named '{name}' found.[/red]")
+            console.file.flush()
+            raise typer.Exit(1)
+
+        if json_output:
+            console.print_json(data=entry.to_json(name))
+            console.file.flush()
+            return
+
+        console.print(f"[bold]{name}[/bold]")
+        console.print(f"  command: {entry.command}")
+        args_display = " ".join(entry.args) if entry.args else "-"
+        console.print(f"  args: {args_display}")
+        if entry.env:
+            env_parts = [f"{key}={value}" for key, value in sorted(entry.env.items())]
+            env_display = ", ".join(env_parts)
+        else:
+            env_display = "-"
+        console.print(f"  env: {env_display}")
+        if entry.startup_timeout_sec is not None:
+            console.print(f"  startup_timeout_sec: {entry.startup_timeout_sec}")
+        if entry.tool_timeout_sec is not None:
+            console.print(f"  tool_timeout_sec: {entry.tool_timeout_sec}")
+        console.print(f"  remove: clean-interfaces mcp remove {name}")
+        console.file.flush()
+
+    def mcp_remove(
+        self,
+        name: Annotated[
+            str,
+            typer.Argument(help="Name of the MCP server configuration to remove."),
+        ],
+    ) -> None:
+        """Remove a configured MCP server."""
+        try:
+            removed = remove_mcp_server(name)
+        except MCPConfigError as exc:
+            self._handle_mcp_error("Failed to update MCP server configuration", exc)
+            return
+
+        if removed:
+            self.logger.info("Removed MCP server entry", name=name)
+            console.print(f"[green]Removed MCP server '{name}'.[/green]")
+        else:
+            console.print(f"[yellow]No MCP server named '{name}' found.[/yellow]")
         console.file.flush()
 
     def run(self) -> None:

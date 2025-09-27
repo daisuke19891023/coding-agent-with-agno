@@ -1,14 +1,18 @@
 """Tests for CLI interface implementation."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
 from clean_interfaces.core import AgentConfigurationError
+from clean_interfaces.config.mcp import McpServerEntry, save_mcp_server
 from clean_interfaces.interfaces.base import BaseInterface
 from clean_interfaces.interfaces.cli import CLIInterface
+
+import tomllib
 
 
 class TestCLIInterface:
@@ -170,4 +174,85 @@ class TestCLIInterface:
                 project_path=tmp_path,
             )
             mock_console.print.assert_any_call("Serena response")
+            mock_console.file.flush.assert_called_once()
+
+    def test_cli_mcp_add_creates_entry(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The mcp add command should persist configuration to TOML."""
+        config_root = tmp_path / "config"
+        monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
+
+        cli = CLIInterface()
+
+        with patch("clean_interfaces.interfaces.cli.console") as mock_console:
+            mock_console.file = MagicMock()
+
+            cli.mcp_add(
+                "docs",
+                ["docs-server", "--port", "4000"],
+                env=["API_KEY=value"],
+            )
+
+        config_path = config_root / "clean-interfaces" / "config.toml"
+        with config_path.open("rb") as fh:
+            data: dict[str, Any] = tomllib.load(fh)
+
+        assert data["mcp_servers"]["docs"]["command"] == "docs-server"
+        assert data["mcp_servers"]["docs"]["args"] == ["--port", "4000"]
+        assert data["mcp_servers"]["docs"]["env"] == {"API_KEY": "value"}
+
+    def test_cli_mcp_list_json_outputs_entries(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The mcp list command should emit JSON when requested."""
+        config_root = tmp_path / "config"
+        monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
+
+        save_mcp_server("docs", McpServerEntry(command="docs-server"))
+
+        cli = CLIInterface()
+
+        with patch("clean_interfaces.interfaces.cli.console") as mock_console:
+            mock_console.file = MagicMock()
+            mock_console.print_json = MagicMock()
+
+            cli.mcp_list(json_output=True)
+
+            mock_console.print_json.assert_called_once()
+            payload = mock_console.print_json.call_args.kwargs["data"]
+            assert payload == [
+                {
+                    "name": "docs",
+                    "command": "docs-server",
+                    "args": [],
+                    "env": None,
+                    "startup_timeout_sec": None,
+                    "tool_timeout_sec": None,
+                },
+            ]
+
+    def test_cli_mcp_remove_missing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Removing a non-existent MCP server should warn the user."""
+        config_root = tmp_path / "config"
+        monkeypatch.setenv("CLEAN_INTERFACES_CONFIG_HOME", str(config_root))
+
+        cli = CLIInterface()
+
+        with patch("clean_interfaces.interfaces.cli.console") as mock_console:
+            mock_console.file = MagicMock()
+
+            cli.mcp_remove("missing")
+
+            mock_console.print.assert_called_with(
+                "[yellow]No MCP server named 'missing' found.[/yellow]",
+            )
             mock_console.file.flush.assert_called_once()
