@@ -362,26 +362,26 @@ class CLIInterface(BaseInterface):
         env: Annotated[
             list[str],
             typer.Option(
-                [],
                 "--env",
                 help="Environment variables to set when launching the server.",
                 metavar="KEY=VALUE",
+                default=[],
             ),
         ],
         startup_timeout_sec: Annotated[
             float | None,
             typer.Option(
-                None,
                 "--startup-timeout-sec",
                 help="Override how long to wait for the server to become ready.",
+                default=None,
             ),
         ] = None,
         tool_timeout_sec: Annotated[
             float | None,
             typer.Option(
-                None,
                 "--tool-timeout-sec",
                 help="Override how long individual MCP tool calls may run.",
+                default=None,
             ),
         ] = None,
     ) -> None:
@@ -416,10 +416,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the configured servers as JSON instead of a table.",
                 is_flag=True,
+                default=_JSON_FLAG_DEFAULT,
             ),
         ] = False,
     ) -> None:
@@ -474,10 +474,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
-                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the server configuration as JSON.",
                 is_flag=True,
+                default=_JSON_FLAG_DEFAULT,
             ),
         ] = False,
     ) -> None:
