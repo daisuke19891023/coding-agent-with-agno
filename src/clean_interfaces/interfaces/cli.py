@@ -416,10 +416,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
+                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the configured servers as JSON instead of a table.",
                 is_flag=True,
-                default=_JSON_FLAG_DEFAULT,
             ),
         ] = _JSON_FLAG_DEFAULT,
     ) -> None:
@@ -474,10 +474,10 @@ class CLIInterface(BaseInterface):
         json_output: Annotated[
             bool,
             typer.Option(
+                _JSON_FLAG_DEFAULT,
                 "--json",
                 help="Render the server configuration as JSON.",
                 is_flag=True,
-                default=_JSON_FLAG_DEFAULT,
             ),
         ] = _JSON_FLAG_DEFAULT,
     ) -> None:
