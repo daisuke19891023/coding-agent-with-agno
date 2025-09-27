@@ -1,7 +1,7 @@
 """CLI interface implementation using Typer."""
 
 from pathlib import Path
-from typing import Annotated, Sequence
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -318,7 +318,7 @@ class CLIInterface(BaseInterface):
         raise typer.Exit(1) from exc
 
     def _parse_env_values(
-        self, env_values: Sequence[str] | None
+        self, env_values: list[str] | None,
     ) -> dict[str, str] | None:
         """Convert repeated KEY=VALUE options into a mapping."""
         if not env_values:
@@ -362,15 +362,15 @@ class CLIInterface(BaseInterface):
             ),
         ],
         env: Annotated[
-            Sequence[str],
+            list[str] | None,
             typer.Option(
-                (),
+                None,
                 "--env",
                 help="Environment variables to set when launching the server.",
                 metavar="KEY=VALUE",
                 show_default=False,
             ),
-        ],
+        ] = None,
         startup_timeout_sec: Annotated[
             float | None,
             typer.Option(
